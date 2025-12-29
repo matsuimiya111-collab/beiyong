@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>定制提粉工具</title>
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#0b3c6f;
+  color:#fff;
+  margin:0;
+  padding:20px;
+}
+.container{
+  max-width:1200px;
+  margin:auto;
+}
+h1{
+  color:#7dd3fc;
+}
+textarea{
+  width:100%;
+  height:260px;
+  background:#082f49;
+  color:#e0f2fe;
+  border:1px solid #38bdf8;
+  padding:10px;
+  font-size:14px;
+}
+.controls{
+  display:flex;
+  gap:10px;
+  margin:15px 0;
+  flex-wrap:wrap;
+}
+input,button{
+  padding:8px 12px;
+  font-size:14px;
+  border-radius:4px;
+  border:none;
+}
+input{
+  width:120px;
+}
+button{
+  background:#38bdf8;
+  color:#022c44;
+  cursor:pointer;
+}
+button:hover{
+  background:#0ea5e9;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+  background:#082f49;
+}
+th,td{
+  border:1px solid #38bdf8;
+  padding:8px;
+  text-align:left;
+}
+th{
+  background:#0369a1;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h1>定制提粉工具</h1>
+
+<textarea id="inputText" placeholder="粘贴 FastPeopleSearch 整段文本"></textarea>
+
+<div class="controls">
+  <input type="number" id="minAge" placeholder="最小年龄" value="18">
+  <input type="number" id="maxAge" placeholder="最大年龄" value="99">
+  <button onclick="extract()">提取数据</button>
+  <button onclick="copyData()">复制数据</button>
+  <button onclick="clearData()">清除数据</button>
+  <button onclick="exportCSV()">导出表格</button>
+</div>
+
+<table id="resultTable">
+<thead>
+<tr>
+  <th>姓名</th>
+  <th>年龄</th>
+  <th>手机号</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+</div>
+
+<script>
+let results = [];
+let phoneSet = new Set();
+
+function normalizePhone(p){
+  return p.replace(/\D/g,'');
+}
+
+function extract(){
+  results = [];
+  phoneSet.clear();
+  document.querySelector("#resultTable tbody").innerHTML = "";
+
+  const text = document.getElementById("inputText").value;
+  const minAge = parseInt(document.getElementById("minAge").value);
+  const maxAge = parseInt(document.getElementById("maxAge").value);
+
+  const blocks = text.split(/\n\s*\n/);
+
+  blocks.forEach(block=>{
+    const nameMatch = block.match(/^([A-Z][a-z]+ [A-Z][a-z]+)/m);
+    const ageMatch = block.match(/Age[: ]+(\d+)/);
+
+    if(!nameMatch || !ageMatch) return;
+
+    const name = nameMatch[1];
+    const age = parseInt(ageMatch[1]);
+    if(age < minAge || age > maxAge) return;
+
+    const phoneSection = block.split(/Phone:/i)[1];
+    if(!phoneSection) return;
+
+    const phoneLines = phoneSection.split('\n');
+
+    for(let line of phoneLines){
+      if(/\(Mobile\)|\(Cell\)|\(Wireless\)/i.test(line)){
+        const phoneMatch = line.match(/(\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4})/);
+        if(phoneMatch){
+          const raw = phoneMatch[1];
+          const norm = normalizePhone(raw);
+          if(!phoneSet.has(norm)){
+            phoneSet.add(norm);
+            results.push({name, age, phone: raw});
+          }
+          break; // 只取第一条 Mobile
+        }
+      }
+    }
+  });
+
+  render();
+}
+
+function render(){
+  const tbody = document.querySelector("#resultTable tbody");
+  tbody.innerHTML = "";
+  results.forEach(r=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.name}</td><td>${r.age}</td><td>${r.phone}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function copyData(){
+  let text = results.map(r=>`${r.name}\t${r.age}\t${r.phone}`).join('\n');
+  navigator.clipboard.writeText(text);
+  alert("已复制");
+}
+
+function clearData(){
+  results = [];
+  phoneSet.clear();
+  document.querySelector("#resultTable tbody").innerHTML = "";
+  document.getElementById("inputText").value = "";
+}
+
+function exportCSV(){
+  let csv = "Name,Age,Phone\n";
+  results.forEach(r=>{
+    csv += `"${r.name}",${r.age},"${r.phone}"\n`;
+  });
+  const blob = new Blob([csv],{type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "fastpeoplesearch_mobile.csv";
+  a.click();
+}
+</script>
+
+</body>
+</html>
