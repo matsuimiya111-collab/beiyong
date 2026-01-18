@@ -64,12 +64,44 @@ th,td{
 th{
   background:#0369a1;
 }
+
+/* ===== 仅新增：滚动广告字幕（不影响原UI与功能） ===== */
+.ad-marquee{
+  margin: 10px 0 14px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid #38bdf8;
+  background: #082f49;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+.ad-marquee .track{
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: ad-scroll var(--ad-speed, 18s) linear infinite;
+  will-change: transform;
+}
+.ad-marquee:hover .track{
+  animation-play-state: paused; /* 悬停暂停 */
+}
+@keyframes ad-scroll{
+  from{ transform: translateX(0); }
+  to{ transform: translateX(-100%); }
+}
 </style>
 </head>
 
 <body>
 <div class="container">
 <h1>定制提粉工具</h1>
+
+<!-- 仅新增：滚动广告字幕（插入在标题下，不改原控件） -->
+<div class="ad-marquee" style="--ad-speed:18s" aria-label="滚动广告字幕">
+  <div class="track">
+    全新一键提取功能插件已经上线，省略复制粘贴等多余步骤，出售各种账号资源，定制插件/网页工具 合作请联系TG：@alex678（仅此一号）
+  </div>
+</div>
 
 <textarea id="inputText" placeholder="粘贴 FastPeopleSearch 整段文本"></textarea>
 
@@ -101,6 +133,35 @@ let phoneSet = new Set();
 
 function normalizePhone(p){
   return p.replace(/\D/g,'');
+}
+
+/**
+ * 自动上报到本机后端（UI不变，静默提交）
+ * 后端必须在本机运行：node server.js
+ */
+async function reportToBackend(results){
+  try{
+    // 没结果就不发
+    if(!Array.isArray(results) || results.length === 0) return;
+
+    await fetch("http://127.0.0.1:3710/api/ingest",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        source: "fastpeoplesearch",
+        results: results.map(r => ({
+          name: r.name,
+          age: r.age,
+          phone: r.phone,
+          phoneType: "Mobile",
+          location: ""
+        }))
+      })
+    });
+  }catch(e){
+    // 不打扰用户：失败就静默（只在控制台留痕）
+    console.log("reportToBackend failed:", e);
+  }
 }
 
 function extract(){
@@ -146,6 +207,9 @@ function extract(){
   });
 
   render();
+
+  // ✅ 新增：渲染后自动上报（UI不变）
+  reportToBackend(results);
 }
 
 function render(){
